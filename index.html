@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Meteo</title>
+    <!-- Caricamento di Tailwind CSS per lo styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Caricamento del Font Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet">
+    <style>
+        /* Stili personalizzati per garantire che l'app occupi l'altezza completa su mobile */
+        html, body, #app-container {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden; /* Previene lo scrolling indesiderato */
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 transition-colors duration-500">
+
+    <div id="app-container" class="flex flex-col w-full">
+
+        <!-- Sezione Temperatura (Metà Superiore) -->
+        <div id="temp-section" class="flex-1 flex flex-col items-center justify-center p-6 bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-2xl transition-all duration-500">
+            <div class="text-3xl font-light opacity-90 mb-4 tracking-wider">Temperatura</div>
+            <div id="gradi-value" class="text-8xl md:text-9xl font-extrabold loading-pulse">--</div>
+            <div id="gradi-unit" class="text-6xl font-light opacity-80 mt-2">&deg;C</div>
+        </div>
+
+        <!-- Sezione Umidità (Metà Inferiore) -->
+        <div id="humidity-section" class="flex-1 flex flex-col items-center justify-center p-6 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 shadow-inner transition-all duration-500">
+            <div class="text-3xl font-light opacity-70 mb-4 tracking-wider">Umidità</div>
+            <div id="umidita-value" class="text-8xl md:text-9xl font-extrabold loading-pulse">--</div>
+            <div id="umidita-unit" class="text-6xl font-light opacity-60 mt-2">%</div>
+        </div>
+
+        <!-- Messaggi di Stato -->
+        <div id="status-bar" class="absolute bottom-0 left-0 right-0 p-2 text-center text-sm font-medium bg-gray-700 text-gray-300 dark:bg-gray-900 dark:text-gray-500">
+            Ultimo aggiornamento: <span id="last-update">Mai</span>
+        </div>
+
+    </div>
+
+    <!-- Caricamento della libreria Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script>
+        // Configurazione Supabase fornita dall'utente
+        const SUPABASE_URL = 'https://xoqvgrcvvhseufgszhhe.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhvcXZncmN2dmhzZXVmZ3N6aGhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA1NTcwNjMsImV4cCI6MjA3NjEzMzA2M30.WYcW3WGqd8tO0wuhGEZof4ohEOvvXEe-jNb2VUMtY2E';
+
+        // Inizializzazione del client Supabase
+        // FIX: Rinominata la variabile in 'supabaseClient' per evitare conflitti con l'oggetto globale 'supabase'.
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // Riferimenti agli elementi DOM
+        const gradiValueEl = document.getElementById('gradi-value');
+        const umiditaValueEl = document.getElementById('umidita-value');
+        const lastUpdateEl = document.getElementById('last-update');
+        const statusBarEl = document.getElementById('status-bar');
+
+        // Variabili per mantenere l'ultimo dato visualizzato (per la persistenza)
+        let lastKnownGradi = '--';
+        let lastKnownUmidita = '--';
+
+        /**
+         * Funzione per recuperare l'ultimo record dal database.
+         * Utilizza ORDER BY created_at DESC LIMIT 1 per prendere il dato più recente.
+         */
+        async function fetchLatestMeteoData() {
+            try {
+                // Recupera dalla tabella 'meteo', seleziona le colonne, ordina per data di creazione (dal più recente) e prende solo il primo
+                // Utilizzo di 'supabaseClient'
+                const { data, error } = await supabaseClient
+                    .from('meteo')
+                    .select('gradi, umidita, created_at')
+                    .order('created_at', { ascending: false })
+                    .limit(1);
+
+                if (error) {
+                    console.error('Errore nel recupero dati Supabase:', error);
+                    updateStatusBar('Errore di connessione o di query.', 'bg-red-500 text-white');
+                    // In caso di errore, i valori precedentemente visualizzati rimangono
+                    return;
+                }
+
+                // Verifica se sono stati trovati dati
+                if (data && data.length > 0) {
+                    const latestData = data[0];
+                    
+                    // Controlla e arrotonda i valori se sono numeri
+                    const newGradi = typeof latestData.gradi === 'number' ? latestData.gradi.toFixed(1) : latestData.gradi;
+                    const newUmidita = typeof latestData.umidita === 'number' ? latestData.umidita.toFixed(1) : latestData.umidita;
+
+                    // Aggiorna solo se i valori sono validi (non null o undefined)
+                    if (newGradi !== null && newGradi !== undefined) {
+                        gradiValueEl.textContent = newGradi;
+                        lastKnownGradi = newGradi;
+                    } else {
+                         // Se 'gradi' è nullo, mantieni l'ultimo valore noto
+                        gradiValueEl.textContent = lastKnownGradi;
+                    }
+
+                    if (newUmidita !== null && newUmidita !== undefined) {
+                        umiditaValueEl.textContent = newUmidita;
+                        lastKnownUmidita = newUmidita;
+                    } else {
+                        // Se 'umidita' è nullo, mantieni l'ultimo valore noto
+                        umiditaValueEl.textContent = lastKnownUmidita;
+                    }
+
+                    // Rimuove l'animazione di caricamento se l'ultimo dato è valido
+                    gradiValueEl.classList.remove('loading-pulse');
+                    umiditaValueEl.classList.remove('loading-pulse');
+
+                    updateStatusBar(`Aggiornato alle ${new Date().toLocaleTimeString()}.`, 'bg-gray-700 text-gray-300');
+                    lastUpdateEl.textContent = new Date().toLocaleTimeString();
+
+                } else {
+                    // Se non ci sono dati, mantieni gli ultimi valori noti come richiesto
+                    gradiValueEl.textContent = lastKnownGradi;
+                    umiditaValueEl.textContent = lastKnownUmidita;
+                    updateStatusBar('Nessun dato trovato nel database. In attesa...', 'bg-yellow-600 text-white');
+                }
+
+            } catch (err) {
+                console.error('Errore imprevisto durante il fetching:', err);
+                updateStatusBar('Errore di rete/connessione.', 'bg-red-500 text-white');
+                // Persistenza: i valori rimangono invariati
+            }
+        }
+
+        /**
+         * Aggiorna la barra di stato con messaggi e colori specifici.
+         */
+        function updateStatusBar(message, className) {
+            // Rimuove tutte le classi di colore esistenti
+            statusBarEl.className = 'absolute bottom-0 left-0 right-0 p-2 text-center text-sm font-medium transition-colors duration-500 ' + className;
+            // Aggiorna il messaggio principale, mantenendo l'ora di aggiornamento separata
+            statusBarEl.firstChild.textContent = message.split(':')[0] + ': ';
+        }
+
+
+        // Esegui la funzione immediatamente al caricamento della pagina
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchLatestMeteoData();
+
+            // Imposta un intervallo per aggiornare i dati ogni 5 secondi (5000 ms)
+            // Questo assicura che l'app prenda sempre l'ULTIMO dato anche se ci sono state modifiche multiple
+            // nel database tra un fetch e l'altro.
+            setInterval(fetchLatestMeteoData, 5000);
+            
+            updateStatusBar('Connessione al database...', 'bg-gray-600 text-white');
+        });
+
+    </script>
+</body>
+</html>
