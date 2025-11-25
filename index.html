@@ -65,6 +65,7 @@
         // Variabili per mantenere l'ultimo dato visualizzato (per la persistenza)
         let lastKnownGradi = '--';
         let lastKnownUmidita = '--';
+        let lastKnownUpdate = 'Mai'; // Nuova variabile per l'orario di persistenza
 
         /**
          * Funzione per recuperare l'ultimo record dal database.
@@ -82,8 +83,8 @@
 
                 if (error) {
                     console.error('Errore nel recupero dati Supabase:', error);
+                    // In caso di errore, visualizza un messaggio di errore ma mantiene l'ora di aggiornamento precedente
                     updateStatusBar('Errore di connessione o di query.', 'bg-red-500 text-white');
-                    // In caso di errore, i valori precedentemente visualizzati rimangono
                     return;
                 }
 
@@ -112,35 +113,44 @@
                         umiditaValueEl.textContent = lastKnownUmidita;
                     }
 
+                    // Aggiorna l'ora dell'ultimo aggiornamento
+                    const currentTime = new Date().toLocaleTimeString();
+                    lastKnownUpdate = currentTime; // Salva la nuova ora
+                    
                     // Rimuove l'animazione di caricamento se l'ultimo dato è valido
                     gradiValueEl.classList.remove('loading-pulse');
                     umiditaValueEl.classList.remove('loading-pulse');
 
-                    updateStatusBar(`Aggiornato alle ${new Date().toLocaleTimeString()}.`, 'bg-gray-700 text-gray-300');
-                    lastUpdateEl.textContent = new Date().toLocaleTimeString();
+                    // Aggiorna la barra di stato con l'ora corrente
+                    updateStatusBar(`Ultimo aggiornamento: ${currentTime}`, 'bg-gray-700 text-gray-300', currentTime);
 
                 } else {
-                    // Se non ci sono dati, mantieni gli ultimi valori noti come richiesto
+                    // Se non ci sono dati, mantieni gli ultimi valori noti (gradi e umidità)
                     gradiValueEl.textContent = lastKnownGradi;
                     umiditaValueEl.textContent = lastKnownUmidita;
-                    updateStatusBar('Nessun dato trovato nel database. In attesa...', 'bg-yellow-600 text-white');
+                    
+                    // Non visualizzare nessun messaggio di "Nessun dato trovato", ma solo l'ultima ora nota
+                    updateStatusBar(`Ultimo aggiornamento: ${lastKnownUpdate}`, 'bg-gray-700 text-gray-300', lastKnownUpdate);
                 }
 
             } catch (err) {
                 console.error('Errore imprevisto durante il fetching:', err);
-                updateStatusBar('Errore di rete/connessione.', 'bg-red-500 text-white');
-                // Persistenza: i valori rimangono invariati
+                updateStatusBar('Errore di rete/connessione.', 'bg-red-500 text-white', lastKnownUpdate);
+                // Persistenza: i valori e l'orario rimangono invariati
             }
         }
 
         /**
          * Aggiorna la barra di stato con messaggi e colori specifici.
+         * Il parametro lastTime assicura che l'ora visualizzata in #last-update sia sempre corretta.
          */
-        function updateStatusBar(message, className) {
+        function updateStatusBar(message, className, lastTime = 'Mai') {
             // Rimuove tutte le classi di colore esistenti
             statusBarEl.className = 'absolute bottom-0 left-0 right-0 p-2 text-center text-sm font-medium transition-colors duration-500 ' + className;
-            // Aggiorna il messaggio principale, mantenendo l'ora di aggiornamento separata
+            // Aggiorna il messaggio principale sulla barra di stato
             statusBarEl.firstChild.textContent = message.split(':')[0] + ': ';
+            // Aggiorna l'elemento <span id="last-update">
+            lastUpdateEl.textContent = lastTime;
         }
 
 
