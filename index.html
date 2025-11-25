@@ -148,10 +148,9 @@
         document.addEventListener('DOMContentLoaded', () => {
             fetchLatestMeteoData();
 
-            // Imposta un intervallo per aggiornare i dati ogni 5 secondi (5000 ms)
-            // Questo assicura che l'app prenda sempre l'ULTIMO dato anche se ci sono state modifiche multiple
-            // nel database tra un fetch e l'altro.
-            setInterval(fetchLatestMeteoData, 5000);
+            // Imposta un intervallo per aggiornare i dati ogni 100 millisecondi (0.1 secondi)
+            const REFRESH_INTERVAL_MS = 100; // Aggiornamento ogni 100ms
+            setInterval(fetchLatestMeteoData, REFRESH_INTERVAL_MS);
             
             updateStatusBar('Connessione al database...', 'bg-gray-600 text-white');
         });
